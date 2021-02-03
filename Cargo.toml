@@ -5,3 +5,4 @@ authors = ["esposm03 <36164633+esposm03@users.noreply.github.com>"]
 edition = "2018"
 
 [dependencies]
+bootloader = "0.9.12"
