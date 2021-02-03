@@ -1,18 +1,13 @@
 #![no_std]
 #![no_main]
 
-static HELLO: &[u8] = b"Hello world!";
+use core::fmt::Write;
+
+mod vga_buffer;
 
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
-    let vga_buf = 0xb8000 as *mut u8;
-
-    for (i, &byte) in HELLO.iter().enumerate() {
-        unsafe {
-            *vga_buf.offset(i as isize * 2) = byte;
-            *vga_buf.offset(i as isize * 2 + 1) = 0xb;
-        }
-    }
+    write!(vga_buffer::WRITER.lock(), "Ciao Arianna\nn1 + 1 = {}", 1+1).unwrap();
 
     loop {}
 }
