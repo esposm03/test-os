@@ -7,12 +7,17 @@ mod vga_buffer;
 
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
-    write!(vga_buffer::WRITER.lock(), "Ciao Arianna\nn1 + 1 = {}", 1+1).unwrap();
+    println!("Ciao mondo");
+    println!("1+1 = {}", 1+1);
+
+    panic!("I'm Gayyy");
 
     loop {}
 }
 
 #[panic_handler]
-fn panic(_: &core::panic::PanicInfo) -> ! {
+fn panic(i: &core::panic::PanicInfo) -> ! {
+    println!("{}", i);
+
     loop {}
 }
