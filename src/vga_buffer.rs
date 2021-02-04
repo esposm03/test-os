@@ -144,3 +144,28 @@ impl fmt::Write for Writer {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod test {
+    #[test_case]
+    fn println_simple() {
+        println!("println_simple output");
+    }
+
+    #[test_case]
+    fn println_many() {
+        for _ in 0..200 {
+            println!("println_many output");
+        }
+    }
+
+    #[test_case]
+    fn println_output() {
+        let s = "Some test string that fits on a single line";
+        println!("{}", s);
+        for (i, c) in s.chars().enumerate() {
+            let screen_char = super::WRITER.lock().buffer.0[super::BUFFER_HEIGHT - 2][i].read();
+            assert_eq!(char::from(screen_char.ascii_char), c);
+        }
+    }
+}

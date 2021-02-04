@@ -1,23 +1,23 @@
 #![no_std]
 #![no_main]
 
-use core::fmt::Write;
+#![feature(custom_test_frameworks)]
+#![test_runner(rpi_os::test_runner)]
+#![reexport_test_harness_main = "test_main"]
 
-mod vga_buffer;
+use rpi_os::println;
 
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
-    println!("Ciao mondo");
-    println!("1+1 = {}", 1+1);
+    println!("Hello world!");
 
-    panic!("I'm Gayyy");
+    #[cfg(test)]
+    test_main();
 
     loop {}
 }
 
-#[panic_handler]
-fn panic(i: &core::panic::PanicInfo) -> ! {
-    println!("{}", i);
-
-    loop {}
+#[test_case]
+fn trivial_assertions() {
+    assert_eq!(1+1, 2);
 }
