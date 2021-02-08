@@ -9,11 +9,10 @@
 pub mod vga_buffer;
 pub mod interrupts;
 pub mod serial;
-
-#[cfg(test)]
-use core::panic::PanicInfo;
+pub mod gdt;
 
 pub fn init() {
+    gdt::init();
     interrupts::init_idt();
 }
 
@@ -46,28 +45,21 @@ pub extern "C" fn _start() -> ! {
     loop {}
 }
 
-#[cfg(test)]
-#[panic_handler]
-pub fn test_panic_handler(info: &PanicInfo) -> ! {
+#[cfg_attr(test, panic_handler)]
+pub fn test_panic_handler(info: &core::panic::PanicInfo) -> ! {
     serial_println!("[failed]\n");
     serial_println!("Error: {}\n", info);
     exit_qemu(0x11);
-    loop {}
 }
 
-#[cfg(not(test))]
-#[panic_handler]
-fn panic(i: &core::panic::PanicInfo) -> ! {
-    println!("{}", i);
 
-    loop {}
-}
-
-pub fn exit_qemu(exit_code: u32) {
+pub fn exit_qemu(exit_code: u32) -> ! {
     use x86_64::instructions::port::Port;
 
     unsafe {
         let mut port = Port::new(0xf4);
         port.write(exit_code);
     }
+
+    loop {}
 }

@@ -1,18 +1,15 @@
 #![no_std]
 #![no_main]
-#![feature(custom_test_frameworks)]
-#![test_runner(rpi_os::test_runner)]
-#![reexport_test_harness_main = "test_main"]
 
-use rpi_os::println;
+use rpi_os::{exit_qemu, println};
 
 #[no_mangle]
 extern "C" fn _start() -> ! {
-    test_main();
-    loop {}
+    println!("Hello world");
+    exit_qemu(0x10);
 }
 
-#[test_case]
-fn test_println() {
-    println!("Hello world");
+#[panic_handler]
+fn panic(info: &core::panic::PanicInfo) -> ! {
+    rpi_os::test_panic_handler(info)
 }
