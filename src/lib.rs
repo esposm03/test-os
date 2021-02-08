@@ -6,6 +6,8 @@
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
+use x86_64::instructions::hlt;
+
 pub mod vga_buffer;
 pub mod interrupts;
 pub mod serial;
@@ -14,6 +16,8 @@ pub mod gdt;
 pub fn init() {
     gdt::init();
     interrupts::init_idt();
+    unsafe { interrupts::PICS.lock().initialize() };
+    x86_64::instructions::interrupts::enable();
 }
 
 pub trait Testable {
@@ -42,7 +46,7 @@ pub fn test_runner(tests: &[&dyn Testable]) {
 pub extern "C" fn _start() -> ! {
     init();
     test_main();
-    loop {}
+    loop { hlt() }
 }
 
 #[cfg_attr(test, panic_handler)]
@@ -61,5 +65,5 @@ pub fn exit_qemu(exit_code: u32) -> ! {
         port.write(exit_code);
     }
 
-    loop {}
+    loop { hlt() }
 }
