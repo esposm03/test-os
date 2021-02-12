@@ -10,25 +10,25 @@ extern crate alloc;
 
 use bootloader::BootInfo;
 use memory::BootInfoFrameAllocator;
-use x86_64::{VirtAddr, instructions::hlt, structures::paging::{FrameAllocator, Mapper, Size4KiB}};
+use x86_64::{instructions::hlt, VirtAddr};
 
+pub mod allocator;
 pub mod gdt;
 pub mod interrupts;
 pub mod memory;
 pub mod serial;
 pub mod vga_buffer;
-pub mod allocator;
 
-pub fn init(info: &'static BootInfo) -> (impl Mapper<Size4KiB>, impl FrameAllocator<Size4KiB>) {
+pub fn init(info: &'static BootInfo) {
     gdt::init();
     interrupts::init_idt();
     unsafe { interrupts::PICS.lock().initialize() };
     x86_64::instructions::interrupts::enable();
 
-    let frame_alloc = unsafe { BootInfoFrameAllocator::init(&info.memory_map) };
-    let mapper = unsafe { memory::init(VirtAddr::new(info.physical_memory_offset)) };
+    let mut frame_allocator = unsafe { BootInfoFrameAllocator::init(&info.memory_map) };
+    let mut mapper = unsafe { memory::init(VirtAddr::new(info.physical_memory_offset)) };
 
-    (mapper, frame_alloc)
+    allocator::init_heap(&mut mapper, &mut frame_allocator).expect("Heap creation failed");
 }
 
 pub trait Testable {
@@ -56,8 +56,8 @@ bootloader::entry_point!(test_start);
 
 /// Entry point for `cargo test`
 #[cfg(test)]
-fn test_start(_: &bootloader::BootInfo) -> ! {
-    init();
+fn test_start(info: &'static bootloader::BootInfo) -> ! {
+    init(info);
     test_main();
     loop {
         hlt()

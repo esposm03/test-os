@@ -6,21 +6,15 @@
 
 extern crate alloc;
 
-use bootloader::{entry_point, BootInfo};
-use rpi_os::{allocator, println};
-use x86_64::instructions::hlt;
 use alloc::boxed::Box;
+use bootloader::{entry_point, BootInfo};
+use rpi_os::println;
+use x86_64::instructions::hlt;
 
 entry_point!(main);
 fn main(info: &'static BootInfo) -> ! {
     println!("Hello world!");
-    let (mut mapper, mut frame_allocator) = rpi_os::init(info);
-
-    allocator::init_heap(&mut mapper, &mut frame_allocator).expect("Heap creation failed");
-
-    let a = Box::new(10);
-
-    println!("a: {}", a);
+    rpi_os::init(info);
 
     #[cfg(test)]
     test_main();
