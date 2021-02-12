@@ -1,17 +1,17 @@
 //! A VGA text-mode driver
 
-use lazy_static::lazy_static;
-use volatile::Volatile;
-use spin::Mutex;
 use core::fmt;
+use lazy_static::lazy_static;
+use spin::Mutex;
+use volatile::Volatile;
 
-lazy_static!(
+lazy_static! {
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
         col_position: 0,
         color: ColorCode::new(Color::White, Color::Black),
         buffer: unsafe { &mut *(0xB8000 as *mut Buffer) },
     });
-);
+}
 
 #[macro_export]
 macro_rules! print {
@@ -29,9 +29,7 @@ pub fn _print(args: fmt::Arguments) {
     use core::fmt::Write;
     use x86_64::instructions::interrupts;
 
-    interrupts::without_interrupts(|| {
-        WRITER.lock().write_fmt(args).unwrap()
-    });
+    interrupts::without_interrupts(|| WRITER.lock().write_fmt(args).unwrap());
 }
 
 const BUFFER_WIDTH: usize = 80;
@@ -77,7 +75,7 @@ struct ScreenChar {
 }
 
 #[repr(transparent)]
-struct Buffer ([[Volatile<ScreenChar>; BUFFER_WIDTH]; BUFFER_HEIGHT]);
+struct Buffer([[Volatile<ScreenChar>; BUFFER_WIDTH]; BUFFER_HEIGHT]);
 
 pub struct Writer {
     col_position: usize,
@@ -89,13 +87,16 @@ impl Writer {
     /// Write a single byte to the VGA text-mode output, going
     /// to the next line if necessary or `\n` was input
     fn write_byte(&mut self, byte: u8) {
-        if byte == b'\n' { self.new_line(); return }
+        if byte == b'\n' {
+            self.new_line();
+            return;
+        }
 
         if self.col_position >= BUFFER_WIDTH {
             self.new_line();
         }
 
-        let row = BUFFER_HEIGHT-1;
+        let row = BUFFER_HEIGHT - 1;
         let col = self.col_position;
         let color = self.color;
 
@@ -123,11 +124,11 @@ impl Writer {
         for row in 1..BUFFER_HEIGHT {
             for col in 0..BUFFER_WIDTH {
                 let character = self.buffer.0[row][col].read();
-                self.buffer.0[row-1][col].write(character);
+                self.buffer.0[row - 1][col].write(character);
             }
         }
 
-        self.clear_row(BUFFER_HEIGHT-1);
+        self.clear_row(BUFFER_HEIGHT - 1);
         self.col_position = 0;
     }
 

@@ -3,13 +3,11 @@
 #![feature(abi_x86_interrupt)]
 
 use core::panic::PanicInfo;
+use rpi_os::{exit_qemu, serial_println, serial_print};
 
 use volatile::Volatile;
-use rpi_os::serial_print;
 use lazy_static::lazy_static;
-use x86_64::structures::idt::InterruptDescriptorTable;
-use rpi_os::{exit_qemu, serial_println};
-use x86_64::structures::idt::InterruptStackFrame;
+use x86_64::structures::idt::{InterruptStackFrame, InterruptDescriptorTable};
 
 extern "x86-interrupt" fn test_double_fault_handler(
     _stack_frame: &mut InterruptStackFrame,

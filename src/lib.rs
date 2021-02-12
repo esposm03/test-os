@@ -1,6 +1,5 @@
 #![no_std]
 #![cfg_attr(test, no_main)]
-
 #![feature(abi_x86_interrupt)]
 #![feature(custom_test_frameworks)]
 #![test_runner(crate::test_runner)]
@@ -8,10 +7,11 @@
 
 use x86_64::instructions::hlt;
 
-pub mod vga_buffer;
-pub mod interrupts;
-pub mod serial;
 pub mod gdt;
+pub mod interrupts;
+pub mod memory;
+pub mod serial;
+pub mod vga_buffer;
 
 pub fn init() {
     gdt::init();
@@ -40,13 +40,17 @@ pub fn test_runner(tests: &[&dyn Testable]) {
     exit_qemu(0x10);
 }
 
+#[cfg(test)]
+bootloader::entry_point!(test_start);
+
 /// Entry point for `cargo test`
 #[cfg(test)]
-#[no_mangle]
-pub extern "C" fn _start() -> ! {
+fn test_start(_: &bootloader::BootInfo) -> ! {
     init();
     test_main();
-    loop { hlt() }
+    loop {
+        hlt()
+    }
 }
 
 #[cfg_attr(test, panic_handler)]
@@ -56,7 +60,6 @@ pub fn test_panic_handler(info: &core::panic::PanicInfo) -> ! {
     exit_qemu(0x11);
 }
 
-
 pub fn exit_qemu(exit_code: u32) -> ! {
     use x86_64::instructions::port::Port;
 
@@ -65,5 +68,7 @@ pub fn exit_qemu(exit_code: u32) -> ! {
         port.write(exit_code);
     }
 
-    loop { hlt() }
+    loop {
+        hlt()
+    }
 }
