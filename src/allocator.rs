@@ -1,15 +1,12 @@
 use core::alloc::Layout;
 
 use linked_list_allocator::LockedHeap;
-use x86_64::{
-    structures::paging::{
-        mapper::MapToError, FrameAllocator, Mapper, Page, PageTableFlags, Size4KiB,
-    },
-    VirtAddr,
-};
 
-pub const HEAP_START: usize = 0x_4444_4444_0000;
-pub const HEAP_SIZE: usize = 100 * 1024; // 100 KiB
+use crate::memory::{FrameAllocator, Pager, VirtAddr};
+
+pub const HEAP_START: u64 = 0x_4444_4444_0000;
+pub const HEAP_SIZE: u64 = 100 * 1024; // 100 KiB
+pub const PAGE_SIZE: usize = 4096;
 
 #[global_allocator]
 static ALLOCATOR: LockedHeap = LockedHeap::empty();
@@ -19,30 +16,28 @@ fn alloc_error_handler(layout: Layout) -> ! {
     panic!("Allocation error: {:?}", layout)
 }
 
-pub fn init_heap(
-    mapper: &mut impl Mapper<Size4KiB>,
-    frame_allocator: &mut impl FrameAllocator<Size4KiB>,
-) -> Result<(), MapToError<Size4KiB>> {
+pub fn init_heap(mapper: &mut impl Pager, frame_allocator: &mut impl FrameAllocator) -> Option<()> {
     let page_range = {
-        let heap_start = VirtAddr::new(HEAP_START as u64);
-        let heap_end = heap_start + HEAP_SIZE - 1u64;
-        let heap_start_page = Page::containing_address(heap_start);
-        let heap_end_page = Page::containing_address(heap_end);
-        Page::range_inclusive(heap_start_page, heap_end_page)
+        let heap_start = HEAP_START;
+        let heap_end = heap_start + HEAP_SIZE - 1;
+
+        (heap_start..heap_end).step_by(PAGE_SIZE)
     };
 
     for page in page_range {
-        let frame = frame_allocator
-            .allocate_frame()
-            .ok_or(MapToError::FrameAllocationFailed)?;
-        let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
+        assert_eq!(page % PAGE_SIZE as u64, 0);
 
-        unsafe { mapper.map_to(page, frame, flags, frame_allocator)?.flush() }
+        let frame = frame_allocator.next()?;
+        let page = VirtAddr(page);
+
+        unsafe { mapper.map(page, frame)? }
     }
 
     unsafe {
-        ALLOCATOR.lock().init(HEAP_START, HEAP_SIZE);
+        ALLOCATOR
+            .lock()
+            .init(HEAP_START as usize, HEAP_SIZE as usize);
     }
 
-    Ok(())
+    Some(())
 }

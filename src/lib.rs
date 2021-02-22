@@ -9,15 +9,17 @@
 extern crate alloc;
 
 use bootloader::BootInfo;
-use memory::BootInfoFrameAllocator;
-use x86_64::{instructions::hlt, VirtAddr};
+use memory::FrameAllocImpl;
+use x86_64::instructions::hlt;
 
 pub mod allocator;
 pub mod gdt;
 pub mod interrupts;
+//pub mod memory;
 pub mod memory;
 pub mod serial;
 pub mod vga_buffer;
+pub use memory;
 
 pub fn init(info: &'static BootInfo) {
     gdt::init();
@@ -25,8 +27,8 @@ pub fn init(info: &'static BootInfo) {
     unsafe { interrupts::PICS.lock().initialize() };
     x86_64::instructions::interrupts::enable();
 
-    let mut frame_allocator = unsafe { BootInfoFrameAllocator::init(&info.memory_map) };
-    let mut mapper = unsafe { memory::init(VirtAddr::new(info.physical_memory_offset)) };
+    let mut frame_allocator = unsafe { FrameAllocImpl::init(&info.memory_map) };
+    let mut mapper = unsafe { memory::init(memory::VirtAddr(info.physical_memory_offset)) };
 
     allocator::init_heap(&mut mapper, &mut frame_allocator).expect("Heap creation failed");
 }
