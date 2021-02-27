@@ -2,7 +2,7 @@ use core::alloc::Layout;
 
 use linked_list_allocator::LockedHeap;
 
-use crate::memory::{FrameAllocator, Pager, VirtAddr};
+use crate::memory::{allocate_frame, Pager, VirtAddr};
 
 pub const HEAP_START: u64 = 0x_4444_4444_0000;
 pub const HEAP_SIZE: u64 = 100 * 1024; // 100 KiB
@@ -16,7 +16,7 @@ fn alloc_error_handler(layout: Layout) -> ! {
     panic!("Allocation error: {:?}", layout)
 }
 
-pub fn init_heap(mapper: &mut impl Pager, frame_allocator: &mut impl FrameAllocator) -> Option<()> {
+pub fn init_heap(mapper: &mut impl Pager) -> Option<()> {
     let page_range = {
         let heap_start = HEAP_START;
         let heap_end = heap_start + HEAP_SIZE - 1;
@@ -27,7 +27,7 @@ pub fn init_heap(mapper: &mut impl Pager, frame_allocator: &mut impl FrameAlloca
     for page in page_range {
         assert_eq!(page % PAGE_SIZE as u64, 0);
 
-        let frame = frame_allocator.next()?;
+        let frame = allocate_frame()?;
         let page = VirtAddr(page);
 
         unsafe { mapper.map(page, frame)? }

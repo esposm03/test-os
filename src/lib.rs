@@ -9,17 +9,14 @@
 extern crate alloc;
 
 use bootloader::BootInfo;
-use memory::FrameAllocImpl;
 use x86_64::instructions::hlt;
 
 pub mod allocator;
 pub mod gdt;
 pub mod interrupts;
-//pub mod memory;
 pub mod memory;
 pub mod serial;
 pub mod vga_buffer;
-pub use memory;
 
 pub fn init(info: &'static BootInfo) {
     gdt::init();
@@ -27,14 +24,18 @@ pub fn init(info: &'static BootInfo) {
     unsafe { interrupts::PICS.lock().initialize() };
     x86_64::instructions::interrupts::enable();
 
-    let mut frame_allocator = unsafe { FrameAllocImpl::init(&info.memory_map) };
-    let mut mapper = unsafe { memory::init(memory::VirtAddr(info.physical_memory_offset)) };
+    let mut mapper = unsafe {
+        memory::init(
+            memory::VirtAddr(info.physical_memory_offset),
+            &info.memory_map,
+        )
+    };
 
-    allocator::init_heap(&mut mapper, &mut frame_allocator).expect("Heap creation failed");
+    allocator::init_heap(&mut mapper).expect("Heap creation failed");
 }
 
 pub trait Testable {
-    fn run(&self) -> ();
+    fn run(&self);
 }
 
 impl<T: Fn()> Testable for T {

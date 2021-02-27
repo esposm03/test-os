@@ -1,10 +1,13 @@
 use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
+use spin::Mutex;
 use x86_64::{
     registers::control::Cr3,
     structures::paging::{self, Mapper, OffsetPageTable, Page, PageTable, PhysFrame, Translate},
 };
 
 use crate::memory::{self, FrameAllocator, Pager};
+
+static FRAME_ALLOCATOR: Mutex<Option<FrameAllocImpl>> = Mutex::new(None);
 
 impl From<x86_64::PhysAddr> for memory::PhysAddr {
     fn from(a: x86_64::PhysAddr) -> Self {
@@ -30,26 +33,47 @@ impl From<memory::VirtAddr> for x86_64::VirtAddr {
     }
 }
 
-pub unsafe fn init(phys_offset: memory::VirtAddr) -> impl Pager {
-    let level_4_table = active_l4_page_table(x86_64::VirtAddr::new(phys_offset.0));
-    PagerImpl(OffsetPageTable::new(level_4_table, phys_offset.into()), Fr)
+/// Init the memory subsystem
+///
+/// # Safety
+/// 
+/// The caller must ensure that the passed-in memory map is correct (as in, every
+/// memory page marked as USABLE must actually be unused)
+pub unsafe fn init(phys_offset: memory::VirtAddr, memory_map: &'static MemoryMap) -> impl Pager {
+    // TODO: Figure out a way to pass platform-specific info
+
+    // Obtain the level 4 page table
+    let (l4_table_frame, _) = Cr3::read();
+    let phys = l4_table_frame.start_address();
+    let virt = phys_offset.0 + phys.as_u64();
+    let page_table_ptr = virt as *mut PageTable;
+    let level_4_table = &mut *page_table_ptr;
+
+    let mut frame_alloc = FRAME_ALLOCATOR.lock();
+    if frame_alloc.is_some() {
+        panic!("`memory::init` function called more than once");
+    }
+    *frame_alloc = Some(FrameAllocImpl::init(memory_map));
+
+    PagerImpl(OffsetPageTable::new(level_4_table, phys_offset.into()))
+}
+
+/// Reserve a frame for use
+pub fn allocate_frame() -> Option<memory::PhysAddr> {
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        let mut lock = FRAME_ALLOCATOR.lock();
+        lock.as_mut()
+            .expect("`memory::init` function has not been called")
+            .next()
+    })
 }
 
 /// Given the physical offset of "map all memory" tables, defined by
 /// the bootloader, return a reference to the active l4 page table.
-unsafe fn active_l4_page_table(phys_offset: x86_64::VirtAddr) -> &'static mut PageTable {
-    let (l4_table_frame, _) = Cr3::read();
 
-    let phys = l4_table_frame.start_address();
-    let virt = phys_offset.as_u64() + phys.as_u64();
-    let page_table_ptr = virt as *mut PageTable;
+pub struct PagerImpl(OffsetPageTable<'static>);
 
-    &mut *page_table_ptr
-}
-
-pub struct PagerImpl(OffsetPageTable<'static>, FrameAllocImpl);
-
-impl Pager for PagerImpl {
+unsafe impl Pager for PagerImpl {
     fn translate(&self, addr: memory::VirtAddr) -> Option<memory::PhysAddr> {
         self.0.translate_addr(addr.into()).map(|a| a.into())
     }
@@ -58,7 +82,11 @@ impl Pager for PagerImpl {
         let page = Page::<paging::Size4KiB>::containing_address(addr.into());
         let frame = PhysFrame::containing_address(to.into());
         let flags = paging::PageTableFlags::PRESENT | paging::PageTableFlags::WRITABLE;
-        let frame_allocator = &mut self.1;
+
+        let mut lock = FRAME_ALLOCATOR.lock();
+        let frame_allocator = lock
+            .as_mut()
+            .expect("`memory::init` function has not been called");
 
         self.0
             .map_to(page, frame, flags, frame_allocator)
@@ -78,9 +106,11 @@ pub struct FrameAllocImpl {
 impl FrameAllocImpl {
     /// Create a FrameAllocator from the passed memory map.
     ///
-    /// This function is unsafe because the caller must guarantee that the passed
-    /// memory map is valid. The main requirement is that all frames that are marked
-    /// as `USABLE` in it are really unused.
+    /// # Safety
+    ///
+    /// The caller must guarantee that the passed memory map is, in fact, valid.
+    /// Also, it must not be called more than once, as that would create two frame
+    /// allocators giving out the same frames.
     pub unsafe fn init(memory_map: &'static MemoryMap) -> Self {
         FrameAllocImpl {
             memory_map,
@@ -88,6 +118,7 @@ impl FrameAllocImpl {
         }
     }
 
+    /// Return an iterator over unallocated frames
     pub fn usable_frames(&self) -> impl Iterator<Item = memory::PhysAddr> {
         self.memory_map
             .iter()
@@ -95,13 +126,14 @@ impl FrameAllocImpl {
             .map(|r| r.range.start_addr()..r.range.end_addr())
             .flat_map(|r| r.step_by(4096))
             .map(|addr| addr - (addr % 4096))
-            .map(|i| memory::PhysAddr(i))
+            .map(memory::PhysAddr)
     }
 }
 
-impl memory::FrameAllocator for FrameAllocImpl {
+unsafe impl memory::FrameAllocator for FrameAllocImpl {
     fn next(&mut self) -> Option<memory::PhysAddr> {
         let frame = self.usable_frames().nth(self.next);
+        assert_eq!(frame.unwrap().0 % 4096, 0);
         self.next += 1;
         frame
     }
