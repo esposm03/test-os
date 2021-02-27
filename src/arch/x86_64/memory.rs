@@ -7,6 +7,9 @@ use x86_64::{
 
 use crate::memory::{self, FrameAllocator, Pager};
 
+/// The size of a page (and frame) on this architecture
+pub const PAGE_SIZE: usize = 4096;
+
 static FRAME_ALLOCATOR: Mutex<Option<FrameAllocImpl>> = Mutex::new(None);
 
 impl From<x86_64::PhysAddr> for memory::PhysAddr {

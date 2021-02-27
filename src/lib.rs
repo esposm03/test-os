@@ -11,13 +11,14 @@ extern crate alloc;
 use bootloader::BootInfo;
 use x86_64::instructions::hlt;
 
-pub mod allocator;
 pub mod gdt;
 pub mod interrupts;
 pub mod memory;
 pub mod serial;
 pub mod vga_buffer;
 
+/// Initialize all of the kernel's subsystems (such as 
+/// interrupt handling, memory management, serial, vga)
 pub fn init(info: &'static BootInfo) {
     gdt::init();
     interrupts::init_idt();
@@ -31,7 +32,7 @@ pub fn init(info: &'static BootInfo) {
         )
     };
 
-    allocator::init_heap(&mut mapper).expect("Heap creation failed");
+    memory::init_heap(&mut mapper).expect("Heap creation failed");
 }
 
 pub trait Testable {

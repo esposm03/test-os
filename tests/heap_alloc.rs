@@ -8,7 +8,7 @@ extern crate alloc;
 
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
-use rpi_os::allocator::HEAP_SIZE;
+use rpi_os::memory::HEAP_SIZE;
 
 use alloc::{boxed::Box, vec::Vec};
 
