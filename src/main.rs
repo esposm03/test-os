@@ -6,7 +6,6 @@
 
 extern crate alloc;
 
-use alloc::boxed::Box;
 use bootloader::{entry_point, BootInfo};
 use rpi_os::println;
 use x86_64::instructions::hlt;
