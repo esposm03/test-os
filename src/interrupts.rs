@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
 use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
-use pic8259_simple::ChainedPics;
+use pic8259::ChainedPics;
 use spin::Mutex;
 use x86_64::{
     instructions::{hlt, port::Port},
@@ -36,25 +36,25 @@ pub fn init_idt() {
     IDT.load();
 }
 
-extern "x86-interrupt" fn breakpoint_handler(st_fr: &mut InterruptStackFrame) {
+extern "x86-interrupt" fn breakpoint_handler(st_fr: InterruptStackFrame) {
     println!("EXCEPTION: BREAKPOINT\n{:#?}", st_fr);
 }
 
 extern "x86-interrupt" fn double_fault_handler(
-    st_fr: &mut InterruptStackFrame,
+    st_fr: InterruptStackFrame,
     _err_code: u64,
 ) -> ! {
     panic!("EXCEPTION: DOUBLE FAULT\n{:#?}", st_fr);
 }
 
-extern "x86-interrupt" fn timer_interrupt_handler(_: &mut InterruptStackFrame) {
+extern "x86-interrupt" fn timer_interrupt_handler(_: InterruptStackFrame) {
     unsafe {
         PICS.lock()
             .notify_end_of_interrupt(InterruptIndex::Timer.as_u8());
     }
 }
 
-extern "x86-interrupt" fn keyboard_interrupt_handler(_: &mut InterruptStackFrame) {
+extern "x86-interrupt" fn keyboard_interrupt_handler(_: InterruptStackFrame) {
     lazy_static! {
         static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> = Mutex::new(
             Keyboard::new(layouts::Us104Key, ScancodeSet1, HandleControl::Ignore)
@@ -81,7 +81,7 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(_: &mut InterruptStackFrame
 }
 
 extern "x86-interrupt" fn page_fault_handler(
-    st_fr: &mut InterruptStackFrame,
+    st_fr: InterruptStackFrame,
     err_code: PageFaultErrorCode,
 ) {
     println!("EXCEPTION: Page Fault");
