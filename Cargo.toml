@@ -1,29 +1,6 @@
-[package]
-name = "rpi-os"
-version = "0.1.0"
-authors = ["esposm03 <36164633+esposm03@users.noreply.github.com>"]
-edition = "2018"
-
-[package.metadata.bootimage]
-test-args = ["-device", "isa-debug-exit,iobase=0xf4,iosize=0x04", "-serial", "stdio", "-display", "none"]
-test-success-exit-code = 33
-run-args = ["-serial", "stdio"]
-
-[dependencies]
-bootloader = { version = "0.9.12", features = ["map_physical_memory"] }
-lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
-linked_list_allocator = "0.9"
-pc-keyboard = "0.5.1"
-pic8259 = "0.10.0"
-spin = "0.7.1"
-uart_16550 = "0.2.12"
-volatile = "0.2.6"
-x86_64 = "0.14"
-
-[[test]]
-name = "basic_boot"
-harness = false
-
-[[test]]
-name = "stack_overflow"
-harness = false
+[workspace]
+members = [
+    "kernel",
+    "delf",
+    "delf",
+]

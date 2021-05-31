@@ -28,9 +28,8 @@
 mod arch;
 
 use core::alloc::Layout;
-
-pub use arch::{allocate_frame, init, FrameAllocImpl, PagerImpl, PAGE_SIZE};
 use linked_list_allocator::LockedHeap;
+pub use arch::{allocate_frame, init, FrameAllocImpl, PagerImpl, PAGE_SIZE};
 
 /// A virtual address - it doesn't correspond to a location
 /// in memory, but must be translated to one.
@@ -70,7 +69,7 @@ pub unsafe trait FrameAllocator {
 ///
 /// # Safety
 /// This trait is unsafe to implement, as it is easy to cause undefined
-/// behaviour unsafety if it is not implemented correctly
+/// behaviour if it is not implemented correctly
 pub unsafe trait Pager {
     /// Translate from virtual to phisical addresses
     ///
@@ -82,7 +81,7 @@ pub unsafe trait Pager {
     ///
     /// # Safety
     /// The called must ensure that the frame given in the `to` argument
-    /// is not already used, and also that nothing is store in the page
+    /// is not already used, and also that nothing is stored in the page
     /// denoted by `addr`, unless everything is copied to the new location
     /// after the remapping
     unsafe fn map(&mut self, addr: VirtAddr, to: PhysAddr) -> Option<()>;

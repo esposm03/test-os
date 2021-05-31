@@ -1,1 +1,4 @@
 target
+
+delf/samples/*
+!delf/samples/src

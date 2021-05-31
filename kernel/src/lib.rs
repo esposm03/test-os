@@ -38,19 +38,20 @@ pub fn init(info: &'static BootInfo) {
     memory::init_heap(&mut mapper).expect("Heap creation failed");
 }
 
-pub trait Testable {
-    fn run(&self);
-}
-
-impl<T: Fn()> Testable for T {
-    fn run(&self) {
-        serial_print!("{}...\t", core::any::type_name::<T>());
-        self();
-        serial_println!("[ok]");
+/// A test runner for the kernel
+pub fn test_runner(tests: &[&dyn Fn()]) {
+    pub trait Testable {
+        fn run(&self);
     }
-}
 
-pub fn test_runner(tests: &[&dyn Testable]) {
+    impl<T: Fn()> Testable for T {
+        fn run(&self) {
+            serial_print!("{}...\t", core::any::type_name::<T>());
+            self();
+            serial_println!("[ok]");
+        }
+    }
+
     serial_println!("Running {} tests", tests.len());
     for test in tests {
         test.run();
