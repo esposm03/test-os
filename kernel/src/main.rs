@@ -1,19 +1,32 @@
 #![no_std]
 #![no_main]
 #![feature(custom_test_frameworks)]
-#![test_runner(rpi_os::test_runner)]
+#![test_runner(kernel::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
 extern crate alloc;
 
-use bootloader::{entry_point, BootInfo};
-use rpi_os::println;
+use kernel::println;
+use delf::process::Process;
+
 use x86_64::instructions::hlt;
+use bootloader::{entry_point, BootInfo};
 
 entry_point!(main);
 fn main(info: &'static BootInfo) -> ! {
     println!("Hello world!");
-    rpi_os::init(info);
+    let mapper = kernel::init(info);
+
+    const SES: &'static [u8] = include_bytes!("../../delf/samples/nolibc");
+    let mut process = Process::new(mapper);
+    println!("New process created");
+    process.load_object(SES).unwrap();
+    println!("loaded");
+    process.apply_relocations().unwrap();
+
+    println!("Jumping...");
+    let entry_point = process.objects[0].file.elf_header.entry_point + process.objects[0].base;
+    unsafe { jmp(entry_point.as_ptr()) };
 
     #[cfg(test)]
     test_main();
@@ -29,4 +42,9 @@ fn panic(i: &core::panic::PanicInfo) -> ! {
     loop {
         hlt()
     }
+}
+
+unsafe fn jmp(addr: *const u8) {
+    let addr: fn() = core::mem::transmute(addr);
+    addr();
 }

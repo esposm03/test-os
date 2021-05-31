@@ -11,18 +11,19 @@
 
 extern crate alloc;
 
-use bootloader::BootInfo;
-use x86_64::instructions::hlt;
-
 pub mod gdt;
 pub mod interrupts;
 pub mod memory;
 pub mod serial;
 pub mod vga_buffer;
 
+use bootloader::BootInfo;
+use types::{Pager, VirtAddr};
+use x86_64::instructions::hlt;
+
 /// Initialize all of the kernel's subsystems (such as 
 /// interrupt handling, memory management, serial, vga)
-pub fn init(info: &'static BootInfo) {
+pub fn init(info: &'static BootInfo) -> impl Pager {
     gdt::init();
     interrupts::init_idt();
     unsafe { interrupts::PICS.lock().initialize() };
@@ -30,12 +31,14 @@ pub fn init(info: &'static BootInfo) {
 
     let mut mapper = unsafe {
         memory::init(
-            memory::VirtAddr(info.physical_memory_offset),
+            VirtAddr(info.physical_memory_offset),
             &info.memory_map,
         )
     };
 
     memory::init_heap(&mut mapper).expect("Heap creation failed");
+
+    mapper
 }
 
 /// A test runner for the kernel

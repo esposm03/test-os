@@ -47,6 +47,7 @@ dependencies = [
  "displaydoc",
  "enumflags2",
  "nom",
+ "types",
 ]
 
 [[package]]
@@ -101,6 +102,23 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "kernel"
+version = "0.1.0"
+dependencies = [
+ "bootloader",
+ "delf",
+ "lazy_static",
+ "linked_list_allocator",
+ "pc-keyboard",
+ "pic8259",
+ "spin 0.7.1",
+ "types",
+ "uart_16550",
+ "volatile 0.2.7",
+ "x86_64",
 ]
 
 [[package]]
@@ -180,21 +198,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rpi-os"
-version = "0.1.0"
-dependencies = [
- "bootloader",
- "lazy_static",
- "linked_list_allocator",
- "pc-keyboard",
- "pic8259",
- "spin 0.7.1",
- "uart_16550",
- "volatile 0.2.7",
- "x86_64",
-]
-
-[[package]]
 name = "scopeguard"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -242,6 +245,13 @@ dependencies = [
  "quote",
  "syn",
  "unicode-xid",
+]
+
+[[package]]
+name = "types"
+version = "0.1.0"
+dependencies = [
+ "x86_64",
 ]
 
 [[package]]

@@ -10,13 +10,14 @@ use crate::{
     errors::{ReadRelaError, ReadSymsError},
     Addr, ParsedElf,
 };
+use types::{Pager, PhysAddr, VirtAddr};
 
 use core::{
     cmp::{max, min},
-    mem,
     ops::Range,
 };
 use alloc::{
+    boxed::Box,
     vec,
     vec::Vec,
     string::{String, ToString},
@@ -35,17 +36,19 @@ use enumflags2::BitFlags;
 ///
 /// This struct represents a list of [`Object`]s
 #[derive(Debug)]
-pub struct Process {
+pub struct Process<T: Pager> {
     pub objects: Vec<Object>,
     // pub search_path: Vec<PathBuf>,
     // pub objects_by_path: BTreeMap<PathBuf, usize>,
     pub files: Vec<Vec<u8>>,
+    mapper: T,
 }
 
-impl<'a> Process {
+impl<'a, T: Pager> Process<T> {
     /// Create a new, empty [`Process`]
-    pub fn new() -> Self {
+    pub fn new(mapper: T) -> Self {
         Self {
+            mapper,
             objects: vec![],
             // search_path: vec!["/usr/lib".into()],
             // objects_by_path: HashMap::new(),
@@ -60,7 +63,7 @@ impl<'a> Process {
     /// dependencies, they will get skipped. If that's not desidred,
     /// you may be looking for the [`load_obj_and_deps`](Self::load_obj_and_deps)
     /// method
-    pub fn load_object<'b: 'a>(&mut self, input: &'b [u8]) -> Result<usize, LoadError> {
+    pub fn load_object<'b: 'a>(&mut self, input: &'static [u8]) -> Result<usize, LoadError> {
         let file = ParsedElf::parse_or_print_error(input)
             .ok_or_else(|| LoadError::ParseError)?;
 
@@ -95,11 +98,12 @@ impl<'a> Process {
             })
             .ok_or(LoadError::NoLoadSegments)?;
 
-        let mem_size: usize = (mem_range.end - mem_range.start).into();
-        let mem_map = MemoryMap::new(mem_size, &[MapOption::MapWritable, MapOption::MapReadable])?;
-        let base = Addr(mem_map.data() as _);
-        mem::forget(mem_map); // Forget the mapping, so it doesn't get dropped
+        // let mem_size: usize = (mem_range.end - mem_range.start).into();
+        // let mem_map = MemoryMap::new(mem_size, &[MapOption::MapWritable, MapOption::MapReadable])?;
+        // mem::forget(mem_map); // Forget the mapping, so it doesn't get dropped
+        let base = Addr(0xDEAD_BEEF_0000);
 
+        println!("loading segments at {:?}", base);
         let segments = load_segments()
             .filter(|&ph| ph.memsz.0 > 0)
             .map(|ph| -> Result<_, LoadError> {
@@ -107,16 +111,24 @@ impl<'a> Process {
                 let padding = ph.vaddr - vaddr;
                 let offset = ph.offset - padding;
                 let filesz = ph.filesz + padding;
-                let map = MemoryMap::new(
-                    filesz.into(),
-                    &[
-                        MapOption::MapReadable,
-                        MapOption::MapWritable,
-                        MapOption::MapFd(fs_file.as_raw_fd()),
-                        MapOption::MapOffset(offset.into()),
-                        MapOption::MapAddr(unsafe { (base + vaddr).as_ptr() }),
-                    ],
-                )?;
+
+                unsafe { 
+                    let mut addr = base + vaddr;
+                    self.mapper.map(VirtAddr(addr.0), PhysAddr(10)).unwrap();
+
+                    addr.as_mut_slice(filesz.into()).copy_from_slice(&input[offset.into()..][..filesz.into()]);
+                };
+
+                // let map = MemoryMap::new(
+                //     filesz.into(),
+                //     &[
+                //         MapOption::MapReadable,
+                //         MapOption::MapWritable,
+                //         MapOption::MapFd(fs_file.as_raw_fd()),
+                //         MapOption::MapOffset(offset.into()),
+                //         MapOption::MapAddr(unsafe { (base + vaddr).as_ptr() }),
+                //     ],
+                // )?;
 
                 // Zero out BSS
                 if ph.memsz > ph.filesz {
@@ -130,7 +142,6 @@ impl<'a> Process {
                 }
 
                 Ok(Segment {
-                    map,
                     padding,
                     flags: ph.flags,
                 })
@@ -211,6 +222,7 @@ impl<'a> Process {
         for obj in self.objects.iter().rev() {
             let symtab_index = obj.file.section_with_type(SectionType::SymTab)?;
             let symtab = obj.file.symtab(symtab_index)?;
+            let symtab = Box::leak(Box::new(symtab));
 
             for sym in symtab.syms() {
                 if sym.name == name {
@@ -231,6 +243,7 @@ impl<'a> Process {
                 let rela_table_index = obj.file.section_with_type(SectionType::Rela)?;
 
                 let rela_table = obj.file.rela(rela_table_index)?;
+                let rela_table = Box::leak(Box::new(rela_table));
                 Some(rela_table.iter().map(move |rel| ObjectRel {
                     relobj: &obj,
                     rel: rel.clone(),
@@ -275,6 +288,7 @@ impl<'a> Process {
         Ok(())
     }
 
+    /*
     /// Set the correct protection for the segments of this process
     pub fn adjust_protections(&self) -> Result<(), region::Error> {
         use region::{protect, Protection};
@@ -296,6 +310,7 @@ impl<'a> Process {
         }
         Ok(())
     }
+    */
 }
 
 /// An ELF object
@@ -313,8 +328,6 @@ pub struct Object {
 /// A segment for an [`Object`]
 #[derive(CustomDebug)]
 pub struct Segment {
-    #[debug(skip)]
-    pub map: MemoryMap,
     pub padding: Addr,
     pub flags: BitFlags<SegmentFlag>,
 }
@@ -365,11 +378,11 @@ pub enum LoadError {
     // /// I/O Error: {0}
     // IO(PathBuf, alloc::io::Error),
     /// ELF object could not be parsed
+    // /// ELF object could not be mapped to memory: {0}
+    // MapError(mmap::MapError),
     ParseError,
     /// ELF object has no load segments
     NoLoadSegments,
-    /// ELF object could not be mapped to memory: {0}
-    MapError(mmap::MapError),
     /// Could not read symbols from ELF object: {0}
     ReadSymsError(ReadSymsError),
     /// Could not read relocations from ELF object: {0}
@@ -390,14 +403,4 @@ pub enum RelocationError {
 pub enum GetResult {
     Cached(usize),
     Fresh(usize),
-}
-
-impl GetResult {
-    fn fresh(self) -> Option<usize> {
-        if let Self::Fresh(index) = self {
-            Some(index)
-        } else {
-            None
-        }
-    }
 }

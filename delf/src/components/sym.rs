@@ -16,6 +16,7 @@ use super::{
     strtab::StrTab,
 };
 
+#[derive(Clone, Copy)]
 pub struct SymTab<'a>(pub &'a SectionHeader<'a>, pub StrTab<'a>);
 
 impl<'a> SymTab<'a> {

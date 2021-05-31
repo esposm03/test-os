@@ -1,5 +1,5 @@
 [package]
-name = "rpi-os"
+name = "kernel"
 version = "0.1.0"
 authors = ["esposm03 <36164633+esposm03@users.noreply.github.com>"]
 edition = "2018"
@@ -19,6 +19,9 @@ spin = "0.7.1"
 uart_16550 = "0.2.12"
 volatile = "0.2.6"
 x86_64 = "0.14"
+
+delf = { path = "../delf" }
+types = { path = "../types" }
 
 [[test]]
 name = "basic_boot"

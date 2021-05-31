@@ -2,5 +2,5 @@
 members = [
     "kernel",
     "delf",
-    "delf",
+    "types",
 ]

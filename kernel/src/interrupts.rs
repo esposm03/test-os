@@ -40,10 +40,7 @@ extern "x86-interrupt" fn breakpoint_handler(st_fr: InterruptStackFrame) {
     println!("EXCEPTION: BREAKPOINT\n{:#?}", st_fr);
 }
 
-extern "x86-interrupt" fn double_fault_handler(
-    st_fr: InterruptStackFrame,
-    _err_code: u64,
-) -> ! {
+extern "x86-interrupt" fn double_fault_handler(st_fr: InterruptStackFrame, _err_code: u64) -> ! {
     panic!("EXCEPTION: DOUBLE FAULT\n{:#?}", st_fr);
 }
 

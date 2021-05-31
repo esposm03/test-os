@@ -1,3 +1,6 @@
+use crate::memory;
+use types::{FrameAllocator, Pager};
+
 use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
 use spin::Mutex;
 use x86_64::{
@@ -5,36 +8,10 @@ use x86_64::{
     structures::paging::{self, Mapper, OffsetPageTable, Page, PageTable, PhysFrame, Translate},
 };
 
-use crate::memory::{self, FrameAllocator, Pager};
-
 /// The size of a page (and frame) on this architecture
 pub const PAGE_SIZE: usize = 4096;
 
 static FRAME_ALLOCATOR: Mutex<Option<FrameAllocImpl>> = Mutex::new(None);
-
-impl From<x86_64::PhysAddr> for memory::PhysAddr {
-    fn from(a: x86_64::PhysAddr) -> Self {
-        Self(a.as_u64())
-    }
-}
-
-impl From<memory::PhysAddr> for x86_64::PhysAddr {
-    fn from(a: memory::PhysAddr) -> Self {
-        x86_64::PhysAddr::new(a.0)
-    }
-}
-
-impl From<x86_64::VirtAddr> for memory::VirtAddr {
-    fn from(a: x86_64::VirtAddr) -> Self {
-        Self(a.as_u64())
-    }
-}
-
-impl From<memory::VirtAddr> for x86_64::VirtAddr {
-    fn from(a: memory::VirtAddr) -> Self {
-        x86_64::VirtAddr::new(a.0)
-    }
-}
 
 /// Init the memory subsystem
 ///
@@ -70,9 +47,6 @@ pub fn allocate_frame() -> Option<memory::PhysAddr> {
             .next()
     })
 }
-
-/// Given the physical offset of "map all memory" tables, defined by
-/// the bootloader, return a reference to the active l4 page table.
 
 pub struct PagerImpl(OffsetPageTable<'static>);
 
@@ -133,7 +107,7 @@ impl FrameAllocImpl {
     }
 }
 
-unsafe impl memory::FrameAllocator for FrameAllocImpl {
+unsafe impl FrameAllocator for FrameAllocImpl {
     fn next(&mut self) -> Option<memory::PhysAddr> {
         let frame = self.usable_frames().nth(self.next);
         assert_eq!(frame.unwrap().0 % 4096, 0);

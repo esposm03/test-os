@@ -10,6 +10,7 @@ use super::{
     sym::{Sym, SymTab},
 };
 
+#[derive(Clone, Copy)]
 pub struct RelaTable<'a>(pub &'a SectionHeader<'a>, pub SymTab<'a>);
 
 impl<'a> RelaTable<'a> {
