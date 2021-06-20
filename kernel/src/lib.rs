@@ -23,10 +23,10 @@ use bootloader::BootInfo;
 use spin::{Mutex, Once};
 use x86_64::instructions::hlt;
 
-pub static KERNEL_STATE: Once<Mutex<KernelState<memory::PagerImpl, memory::FrameAllocImpl, ()>>> = Once::new();
+pub static KERNEL_STATE: Once<KernelState<memory::PagerImpl, memory::FrameAllocImpl, ()>> = Once::new();
 
 #[track_caller]
-pub fn kernel_state() -> &'static Mutex<KernelState<memory::PagerImpl, memory::FrameAllocImpl, ()>> {
+pub fn kernel_state() -> &'static KernelState<memory::PagerImpl, memory::FrameAllocImpl, ()> {
     KERNEL_STATE.get().expect("KERNEL_STATE has not been initialized yet")
 }
 
@@ -45,13 +45,16 @@ pub fn init(info: &'static BootInfo) {
         )
     };
 
-    KERNEL_STATE.call_once(|| Mutex::new(KernelState {
+    let frame_alloc = Mutex::new(frame_alloc);
+    let pager = Mutex::new(pager);
+
+    KERNEL_STATE.call_once(|| KernelState {
         pager,
         vga_buffer: (),
         frame_alloc,
-    }));
+    });
 
-    memory::init_heap(&mut kernel_state().lock().pager).expect("Heap creation failed");
+    memory::init_heap().expect("Heap creation failed");
 }
 
 /// A test runner for the kernel

@@ -4,10 +4,18 @@ extern crate alloc;
 
 use alloc::boxed::Box;
 
+use spin::Mutex;
+
 pub struct KernelState<P: Pager, F: FrameAllocator, V> {
-    pub pager: P,
-    pub frame_alloc: F,
+    pub pager: Mutex<P>,
+    pub frame_alloc: Mutex<F>,
     pub vga_buffer: V,
+}
+
+impl<P: Pager, F: FrameAllocator, V> KernelState<P, F, V> {
+    pub fn allocate_frame(&self) -> PhysAddr {
+        self.frame_alloc.lock().next().expect("All frames have been used")
+    }
 }
 
 /// A virtual address - it doesn't correspond to a location

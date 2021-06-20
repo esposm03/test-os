@@ -252,6 +252,7 @@ dependencies = [
 name = "types"
 version = "0.1.0"
 dependencies = [
+ "spin 0.7.1",
  "x86_64",
 ]
 

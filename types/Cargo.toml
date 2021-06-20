@@ -5,3 +5,4 @@ edition = "2018"
 
 [dependencies]
 x86_64 = "0.14"
+spin = "0.7.1"

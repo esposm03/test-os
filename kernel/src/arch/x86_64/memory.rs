@@ -38,8 +38,8 @@ pub unsafe fn init(
 /// Reserve a frame for use
 pub fn allocate_frame() -> Option<memory::PhysAddr> {
     x86_64::instructions::interrupts::without_interrupts(|| {
-        let mut lock = kernel_state().lock();
-        lock.frame_alloc.next()
+        let mut lock = kernel_state().frame_alloc.lock();
+        lock.next()
     })
 }
 
@@ -57,8 +57,8 @@ unsafe impl Pager for PagerImpl {
         let frame = PhysFrame::containing_address(to.into());
         let flags = paging::PageTableFlags::PRESENT | paging::PageTableFlags::WRITABLE;
 
-        let mut lock = kernel_state().lock();
-        let frame_allocator = &mut lock.frame_alloc;
+        let lock = &mut kernel_state().frame_alloc.lock();
+        let frame_allocator: &mut FrameAllocImpl = &mut *lock;
 
         self.0
             .map_to(page, frame, flags, frame_allocator)

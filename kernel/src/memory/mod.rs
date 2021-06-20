@@ -33,6 +33,8 @@ use core::alloc::Layout;
 use linked_list_allocator::LockedHeap;
 pub use arch::{allocate_frame, init, FrameAllocImpl, PagerImpl, PAGE_SIZE};
 
+use crate::kernel_state;
+
 /// The physical address of the heap
 pub const HEAP_START: u64 = 0x_4444_4444_0000;
 /// The size in bytes of the heap
@@ -47,7 +49,7 @@ fn alloc_error_handler(layout: Layout) -> ! {
 }
 
 /// Initialize a heap for the kernel, and set up the allocator
-pub fn init_heap(mapper: &mut impl Pager) -> Option<()> {
+pub fn init_heap() -> Option<()> {
     let page_range = {
         let heap_start = HEAP_START;
         let heap_end = heap_start + HEAP_SIZE - 1;
@@ -61,6 +63,7 @@ pub fn init_heap(mapper: &mut impl Pager) -> Option<()> {
         let frame = allocate_frame()?;
         let page = VirtAddr(page);
 
+        let mut mapper = kernel_state().pager.lock();
         unsafe { mapper.map(page, frame)? }
     }
 
