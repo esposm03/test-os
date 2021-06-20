@@ -1,8 +1,7 @@
-use crate::memory;
+use crate::{kernel_state, memory};
 use types::{FrameAllocator, Pager};
 
 use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
-use spin::Mutex;
 use x86_64::{
     registers::control::Cr3,
     structures::paging::{self, Mapper, OffsetPageTable, Page, PageTable, PhysFrame, Translate},
@@ -11,15 +10,16 @@ use x86_64::{
 /// The size of a page (and frame) on this architecture
 pub const PAGE_SIZE: usize = 4096;
 
-static FRAME_ALLOCATOR: Mutex<Option<FrameAllocImpl>> = Mutex::new(None);
-
 /// Init the memory subsystem
 ///
 /// # Safety
-/// 
+///
 /// The caller must ensure that the passed-in memory map is correct (as in, every
 /// memory page marked as USABLE must actually be unused)
-pub unsafe fn init(phys_offset: memory::VirtAddr, memory_map: &'static MemoryMap) -> impl Pager {
+pub unsafe fn init(
+    phys_offset: memory::VirtAddr,
+    mem_map: &'static MemoryMap,
+) -> (PagerImpl, FrameAllocImpl) {
     // TODO: Figure out a way to pass platform-specific info
 
     // Obtain the level 4 page table
@@ -29,22 +29,17 @@ pub unsafe fn init(phys_offset: memory::VirtAddr, memory_map: &'static MemoryMap
     let page_table_ptr = virt as *mut PageTable;
     let level_4_table = &mut *page_table_ptr;
 
-    let mut frame_alloc = FRAME_ALLOCATOR.lock();
-    if frame_alloc.is_some() {
-        panic!("`memory::init` function called more than once");
-    }
-    *frame_alloc = Some(FrameAllocImpl::init(memory_map));
+    let frame_alloc = FrameAllocImpl::init(mem_map);
+    let pager = PagerImpl(OffsetPageTable::new(level_4_table, phys_offset.into()));
 
-    PagerImpl(OffsetPageTable::new(level_4_table, phys_offset.into()))
+    (pager, frame_alloc)
 }
 
 /// Reserve a frame for use
 pub fn allocate_frame() -> Option<memory::PhysAddr> {
     x86_64::instructions::interrupts::without_interrupts(|| {
-        let mut lock = FRAME_ALLOCATOR.lock();
-        lock.as_mut()
-            .expect("`memory::init` function has not been called")
-            .next()
+        let mut lock = kernel_state().lock();
+        lock.frame_alloc.next()
     })
 }
 
@@ -56,14 +51,14 @@ unsafe impl Pager for PagerImpl {
     }
 
     unsafe fn map(&mut self, addr: memory::VirtAddr, to: memory::PhysAddr) -> Option<()> {
+        crate::println!("Mapping 0x{:x} -> 0x{:x}", addr.0, to.0);
+
         let page = Page::<paging::Size4KiB>::containing_address(addr.into());
         let frame = PhysFrame::containing_address(to.into());
         let flags = paging::PageTableFlags::PRESENT | paging::PageTableFlags::WRITABLE;
 
-        let mut lock = FRAME_ALLOCATOR.lock();
-        let frame_allocator = lock
-            .as_mut()
-            .expect("`memory::init` function has not been called");
+        let mut lock = kernel_state().lock();
+        let frame_allocator = &mut lock.frame_alloc;
 
         self.0
             .map_to(page, frame, flags, frame_allocator)

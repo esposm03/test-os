@@ -47,6 +47,7 @@ dependencies = [
  "displaydoc",
  "enumflags2",
  "nom",
+ "spin 0.7.1",
  "types",
 ]
 

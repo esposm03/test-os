@@ -7,7 +7,6 @@
 extern crate alloc;
 
 use kernel::println;
-use delf::process::Process;
 
 use x86_64::instructions::hlt;
 use bootloader::{entry_point, BootInfo};
@@ -15,18 +14,7 @@ use bootloader::{entry_point, BootInfo};
 entry_point!(main);
 fn main(info: &'static BootInfo) -> ! {
     println!("Hello world!");
-    let mapper = kernel::init(info);
-
-    const SES: &'static [u8] = include_bytes!("../../delf/samples/nolibc");
-    let mut process = Process::new(mapper);
-    println!("New process created");
-    process.load_object(SES).unwrap();
-    println!("loaded");
-    process.apply_relocations().unwrap();
-
-    println!("Jumping...");
-    let entry_point = process.objects[0].file.elf_header.entry_point + process.objects[0].base;
-    unsafe { jmp(entry_point.as_ptr()) };
+    kernel::init(info);
 
     #[cfg(test)]
     test_main();

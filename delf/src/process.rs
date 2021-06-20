@@ -10,7 +10,7 @@ use crate::{
     errors::{ReadRelaError, ReadSymsError},
     Addr, ParsedElf,
 };
-use types::{Pager, PhysAddr, VirtAddr};
+use types::{FrameAllocator, Pager, VirtAddr};
 
 use core::{
     cmp::{max, min},
@@ -36,19 +36,22 @@ use enumflags2::BitFlags;
 ///
 /// This struct represents a list of [`Object`]s
 #[derive(Debug)]
-pub struct Process<T: Pager> {
+pub struct Process<T: 'static + Pager, F: 'static + FrameAllocator> {
     pub objects: Vec<Object>,
     // pub search_path: Vec<PathBuf>,
     // pub objects_by_path: BTreeMap<PathBuf, usize>,
     pub files: Vec<Vec<u8>>,
-    mapper: T,
+
+    mapper: &'static mut T,
+    frame_allocator: &'static mut F,
 }
 
-impl<'a, T: Pager> Process<T> {
+impl<'a, T: Pager, F: FrameAllocator> Process<T, F> {
     /// Create a new, empty [`Process`]
-    pub fn new(mapper: T) -> Self {
+    pub fn new(mapper: &'static mut T, frame_allocator: &'static mut F) -> Self {
         Self {
             mapper,
+            frame_allocator,
             objects: vec![],
             // search_path: vec!["/usr/lib".into()],
             // objects_by_path: HashMap::new(),
@@ -103,7 +106,7 @@ impl<'a, T: Pager> Process<T> {
         // mem::forget(mem_map); // Forget the mapping, so it doesn't get dropped
         let base = Addr(0xDEAD_BEEF_0000);
 
-        println!("loading segments at {:?}", base);
+        // println!("loading segments at {:?}", base);
         let segments = load_segments()
             .filter(|&ph| ph.memsz.0 > 0)
             .map(|ph| -> Result<_, LoadError> {
@@ -114,7 +117,8 @@ impl<'a, T: Pager> Process<T> {
 
                 unsafe { 
                     let mut addr = base + vaddr;
-                    self.mapper.map(VirtAddr(addr.0), PhysAddr(10)).unwrap();
+                    let physaddr = self.frame_allocator.next().unwrap();
+                    self.mapper.map(VirtAddr(addr.0), physaddr).unwrap();
 
                     addr.as_mut_slice(filesz.into()).copy_from_slice(&input[offset.into()..][..filesz.into()]);
                 };

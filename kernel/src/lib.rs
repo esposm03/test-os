@@ -17,28 +17,41 @@ pub mod memory;
 pub mod serial;
 pub mod vga_buffer;
 
+use types::{KernelState, VirtAddr};
+
 use bootloader::BootInfo;
-use types::{Pager, VirtAddr};
+use spin::{Mutex, Once};
 use x86_64::instructions::hlt;
+
+pub static KERNEL_STATE: Once<Mutex<KernelState<memory::PagerImpl, memory::FrameAllocImpl, ()>>> = Once::new();
+
+#[track_caller]
+pub fn kernel_state() -> &'static Mutex<KernelState<memory::PagerImpl, memory::FrameAllocImpl, ()>> {
+    KERNEL_STATE.get().expect("KERNEL_STATE has not been initialized yet")
+}
 
 /// Initialize all of the kernel's subsystems (such as 
 /// interrupt handling, memory management, serial, vga)
-pub fn init(info: &'static BootInfo) -> impl Pager {
+pub fn init(info: &'static BootInfo) {
     gdt::init();
     interrupts::init_idt();
     unsafe { interrupts::PICS.lock().initialize() };
     x86_64::instructions::interrupts::enable();
 
-    let mut mapper = unsafe {
+    let (pager, frame_alloc) = unsafe {
         memory::init(
             VirtAddr(info.physical_memory_offset),
             &info.memory_map,
         )
     };
 
-    memory::init_heap(&mut mapper).expect("Heap creation failed");
+    KERNEL_STATE.call_once(|| Mutex::new(KernelState {
+        pager,
+        vga_buffer: (),
+        frame_alloc,
+    }));
 
-    mapper
+    memory::init_heap(&mut kernel_state().lock().pager).expect("Heap creation failed");
 }
 
 /// A test runner for the kernel
