@@ -1,6 +1,6 @@
 //! Loading of ELF objects, with dependencies
 
-use crate::{
+use crate::{delf::{
     components::{
         rela::{Rela, RelocationType},
         section::SectionType,
@@ -9,7 +9,7 @@ use crate::{
     },
     errors::{ReadRelaError, ReadSymsError},
     Addr, ParsedElf,
-};
+}, kernel_state, println};
 use types::{FrameAllocator, Pager, VirtAddr};
 
 use core::{
@@ -36,22 +36,17 @@ use enumflags2::BitFlags;
 ///
 /// This struct represents a list of [`Object`]s
 #[derive(Debug)]
-pub struct Process<T: 'static + Pager, F: 'static + FrameAllocator> {
+pub struct Process {
     pub objects: Vec<Object>,
     // pub search_path: Vec<PathBuf>,
     // pub objects_by_path: BTreeMap<PathBuf, usize>,
     pub files: Vec<Vec<u8>>,
-
-    mapper: &'static mut T,
-    frame_allocator: &'static mut F,
 }
 
-impl<'a, T: Pager, F: FrameAllocator> Process<T, F> {
+impl<'a> Process {
     /// Create a new, empty [`Process`]
-    pub fn new(mapper: &'static mut T, frame_allocator: &'static mut F) -> Self {
+    pub fn new() -> Self {
         Self {
-            mapper,
-            frame_allocator,
             objects: vec![],
             // search_path: vec!["/usr/lib".into()],
             // objects_by_path: HashMap::new(),
@@ -76,23 +71,6 @@ impl<'a, T: Pager, F: FrameAllocator> Process<T, F> {
                 .filter(|&ph| ph.typ == SegmentType::Load)
         };
 
-        // Add `DT_RUNPATH` members to the search path
-        /*
-        let _ = file
-            .dynamic_section()
-            .map(|sect| sect.entry_with_tag(DynamicTag::RPath))
-            .flatten()
-            .map(|entry| entry.addr.unwrap_string())
-            .map(|path| path.replace("$ORIGIN", &origin))
-            .map(|path| path.split(':').map(|i| i.to_string()).collect::<Vec<_>>())
-            .map(|strs| {
-                strs.iter()
-                    .filter(|i| !i.contains("/nix/store"))
-                    .map(PathBuf::from)
-                    .for_each(|rpath| self.search_path.push(rpath))
-            });
-        */
-
         let mem_range = load_segments()
             .map(|ph| ph.mem_range())
             .fold(None, |acc, range| match acc {
@@ -101,12 +79,9 @@ impl<'a, T: Pager, F: FrameAllocator> Process<T, F> {
             })
             .ok_or(LoadError::NoLoadSegments)?;
 
-        // let mem_size: usize = (mem_range.end - mem_range.start).into();
-        // let mem_map = MemoryMap::new(mem_size, &[MapOption::MapWritable, MapOption::MapReadable])?;
-        // mem::forget(mem_map); // Forget the mapping, so it doesn't get dropped
         let base = Addr(0xDEAD_BEEF_0000);
 
-        // println!("loading segments at {:?}", base);
+        println!("loading segments at {:?}", base);
         let segments = load_segments()
             .filter(|&ph| ph.memsz.0 > 0)
             .map(|ph| -> Result<_, LoadError> {
@@ -117,22 +92,11 @@ impl<'a, T: Pager, F: FrameAllocator> Process<T, F> {
 
                 unsafe { 
                     let mut addr = base + vaddr;
-                    let physaddr = self.frame_allocator.next().unwrap();
-                    self.mapper.map(VirtAddr(addr.0), physaddr).unwrap();
+                    let physaddr = kernel_state().allocate_frame();
+                    kernel_state().pager.lock().map(VirtAddr(addr.0), physaddr).unwrap();
 
                     addr.as_mut_slice(filesz.into()).copy_from_slice(&input[offset.into()..][..filesz.into()]);
                 };
-
-                // let map = MemoryMap::new(
-                //     filesz.into(),
-                //     &[
-                //         MapOption::MapReadable,
-                //         MapOption::MapWritable,
-                //         MapOption::MapFd(fs_file.as_raw_fd()),
-                //         MapOption::MapOffset(offset.into()),
-                //         MapOption::MapAddr(unsafe { (base + vaddr).as_ptr() }),
-                //     ],
-                // )?;
 
                 // Zero out BSS
                 if ph.memsz > ph.filesz {

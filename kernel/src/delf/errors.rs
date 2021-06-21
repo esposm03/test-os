@@ -1,6 +1,6 @@
-use crate::components::dynamic::DynamicTag;
-
 use alloc::string::String;
+
+use crate::delf::components::dynamic::DynamicTag;
 
 use displaydoc::Display;
 

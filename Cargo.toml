@@ -1,6 +1,5 @@
 [workspace]
 members = [
     "kernel",
-    "delf",
     "types",
 ]

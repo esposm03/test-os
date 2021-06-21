@@ -1,6 +1,6 @@
 use alloc::{borrow::Cow, string::String};
 
-use crate::{Addr, components::section::SectionHeader};
+use crate::delf::{Addr, components::section::SectionHeader};
 
 /// A section whose content is to be interpreted as a symbol table
 ///

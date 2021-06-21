@@ -3,11 +3,12 @@
 use core::{fmt, ops::Range};
 use alloc::vec::Vec;
 
-use crate::{impl_parse_for_enum, impl_parse_for_enumflags, parse, Addr};
+use crate::delf::{parse, Addr, components::dynamic::DynamicEntry};
+use crate::{impl_parse_for_enum, impl_parse_for_enumflags};
+
 use derive_try_from_primitive::TryFromPrimitive;
 use enumflags2::{bitflags, BitFlags};
 
-use super::dynamic::DynamicEntry;
 
 /// A program header
 ///

@@ -1,6 +1,6 @@
 use alloc::{borrow::Cow, vec::Vec};
 
-use crate::{
+use crate::delf::{
     components::{section::SectionHeader, strtab::StrTab},
     impl_parse_for_enum, parse, Addr,
 };

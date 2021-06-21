@@ -1,9 +1,5 @@
 //! Parsing Elf files
 
-#![no_std]
-
-extern crate alloc;
-
 pub mod components;
 pub mod errors;
 pub mod parse;
@@ -37,6 +33,8 @@ use nom::{
     Err::{Error, Failure},
     Offset,
 };
+
+use crate::impl_parse_for_enum;
 
 /// An ELF file
 #[derive(Debug, Clone)]

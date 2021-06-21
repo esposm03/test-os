@@ -9,7 +9,7 @@ use nom::{
     sequence::tuple,
 };
 
-use crate::{impl_parse_for_bitenum, parse, Addr};
+use crate::delf::{parse, Addr};
 
 use super::{
     section::{SectionHeader, SectionIndex},
@@ -56,8 +56,8 @@ pub enum SymType {
     Unknown1 = 10,
 }
 
-impl_parse_for_bitenum!(SymBind, 4_usize);
-impl_parse_for_bitenum!(SymType, 4_usize);
+crate::impl_parse_for_bitenum!(SymBind, 4_usize);
+crate::impl_parse_for_bitenum!(SymType, 4_usize);
 
 /// A symbol
 #[derive(Clone, Debug)]

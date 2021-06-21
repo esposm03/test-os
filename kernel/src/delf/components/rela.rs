@@ -3,7 +3,7 @@
 use derive_try_from_primitive::TryFromPrimitive;
 use nom::number::complete::le_u32;
 
-use crate::{impl_parse_for_enum, parse, Addr};
+use crate::delf::{impl_parse_for_enum, parse, Addr};
 
 use super::{
     section::SectionHeader,

@@ -3,6 +3,8 @@
 use core::{fmt, ops::RangeFrom};
 use alloc::{string::String, vec::Vec, vec};
 
+use crate::delf::HexDump;
+
 use nom::{ErrorConvert, Slice};
 
 /// Given an enum, implement a `parse` method for it that takes a primitive,
@@ -64,7 +66,7 @@ macro_rules! impl_parse_for_bitenum {
                 let (i, val): (_, u8) = take($bits)(full_input)?;
                 match Self::try_from(val) {
                     Ok(val) => Ok((i, val)),
-                    Err(_) => Err(nom::Err::Failure($crate::parse::Error::from_string(
+                    Err(_) => Err(nom::Err::Failure($crate::delf::parse::Error::from_string(
                         full_input,
                         format!("Unknown {} {} (0x{:x})", stringify!($type), val, val),
                     ))),
@@ -96,7 +98,7 @@ impl fmt::Debug for Error<&[u8]> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (input, err) in &self.errors {
             writeln!(f, "{:?}:", err)?;
-            writeln!(f, "input: {:?}", crate::HexDump(input))?;
+            writeln!(f, "input: {:?}", HexDump(input))?;
         }
         Ok(())
     }

@@ -9,7 +9,7 @@ use nom::{
     sequence::tuple,
 };
 
-use crate::{impl_parse_for_enum, parse, Addr};
+use crate::delf::{impl_parse_for_enum, parse, Addr};
 
 /// An header for a section
 #[derive(Debug, Clone)]
